@@ -9,11 +9,11 @@ async function fetchAndStoreAlbums() {
         });
         if (!res.ok) throw new Error("Failed to fetch albums");
         const albums = await res.json();
-        await browser.storage.sync.set({ immich_albums: albums });
+        await browser.storage.local.set({ immich_albums: albums });
         return albums;
     } catch (e) {
         console.error("Error fetching albums:", e);
-        await browser.storage.sync.set({ immich_albums: [] });
+        await browser.storage.local.set({ immich_albums: [] });
         return [];
     }
 }
@@ -26,7 +26,7 @@ async function createAlbumMenus() {
         title: "Upload image/video to Immich",
         contexts: ["image", "video"],
     });
-    const { immich_albums } = await browser.storage.sync.get("immich_albums");
+    const { immich_albums } = await browser.storage.local.get("immich_albums");
     if (immich_albums && Array.isArray(immich_albums)) {
         for (const album of immich_albums) {
             browser.contextMenus.create({
@@ -39,8 +39,12 @@ async function createAlbumMenus() {
     }
 }
 
-// Initial load of albums and menus
-fetchAndStoreAlbums().then(createAlbumMenus);
+
+// Remove initial load. Instead, update albums and menus when context menu is about to show
+browser.contextMenus.onShown.addListener(async () => {
+    await fetchAndStoreAlbums();
+    await createAlbumMenus();
+});
 
 // Listen for reload message from options
 browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
